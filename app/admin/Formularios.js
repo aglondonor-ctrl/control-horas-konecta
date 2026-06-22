@@ -6,6 +6,16 @@
           <h3 className="text-lg font-bold text-blue-950">{empForm.editando ? 'Editar Empleado' : 'Añadir Empleado'}</h3>
           <input type="text" disabled={empForm.editando} value={empForm.cedula} onChange={e => setEmpForm({...empForm, cedula: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50 disabled:opacity-50" placeholder="Cédula" />
           <input type="text" value={empForm.nombre} onChange={e => setEmpForm({...empForm, nombre: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50" placeholder="Nombre completo" />
+          <input type="email" value={empForm.correo} onChange={e => setEmpForm({...empForm, correo: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50" placeholder="Correo electrónico" />
+          <select value={empForm.equipo} onChange={e => setEmpForm({...empForm, equipo: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50">
+            <option value="">-- Selecciona un equipo --</option>
+            <option value="IVR">IVR</option>
+            <option value="TechBridge">TechBridge</option>
+            <option value="KCRM y CRM Banco">KCRM y CRM Banco</option>
+            <option value="IVR Bancolombia">IVR Bancolombia</option>
+          </select>
+          <input type="tel" value={empForm.telefono} onChange={e => setEmpForm({...empForm, telefono: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50" placeholder="Teléfono" />
+          <input type="text" value={empForm.cargo} onChange={e => setEmpForm({...empForm, cargo: e.target.value})} required className="w-full border p-2 rounded text-black bg-gray-50" placeholder="Cargo" />
           <select value={empForm.estado} onChange={e => setEmpForm({...empForm, estado: e.target.value})} className="w-full border p-2 rounded text-black bg-gray-50">
             <option value="activo">Activo</option>
             <option value="inactivo">Inactivo</option>

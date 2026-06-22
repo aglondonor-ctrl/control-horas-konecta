@@ -1,14 +1,17 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function HorasExtrasPage() {
+  const router = useRouter();
   const [registros, setRegistros] = useState([]);
   const [mensaje, setMensaje] = useState({ texto: '', tipo: '' });
   const [fechaMaxima, setFechaMaxima] = useState('');
   const [formData, setFormData] = useState({
     cedula: '',
     equipo: '',
+    CECO: '5712200100',
     fecha: '',
     hora_inicio: '',
     hora_fin: '',
@@ -18,19 +21,42 @@ export default function HorasExtrasPage() {
   const equiposDisponibles = ["IVR", "TechBridge", "KCRM y CRM Banco", "IVR Bancolombia"];
 
   // 1. Obtener fecha actual en formato YYYY-MM-DD para bloquear fechas futuras
-  useEffect(() => {
-    const hoy = new Date().toISOString().split('T')[0];
-    setFechaMaxima(hoy);
-    fetchRegistros();
-  }, []);
+    useEffect(() => {
+    const verificarUsuario = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push('/login'); // Si no está logueado, va al login único
+        return;
+      }
 
-  const fetchRegistros = async () => {
+      // Si el correo termina en .local extraemos la cédula automáticamente
+      if (user.email.endsWith('@konecta.local')) {
+        const cedulaCalculada = user.email.split('@')[0];
+        setFormData(prev => ({ ...prev, cedula: cedulaCalculada }));
+        fetchRegistros(cedulaCalculada);
+      }
+    };
+
+    const hoy = new Date().toISOString().split('T');
+    setFechaMaxima(hoy[0]);
+    verificarUsuario();
+  }, [router]);
+
+
+  const fetchRegistros = async (cedula) => {
+    if (!cedula) return;
     const { data, error } = await supabase
       .from('horas_extras')
       .select('*')
+      .eq('cedula', cedula) // Solo los registros del propio empleado
       .order('created_at', { ascending: false });
-    
+
     if (!error) setRegistros(data || []);
+  };
+
+  const cerrarSesion = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
   };
 
   const handleChange = (e) => {
@@ -54,7 +80,7 @@ export default function HorasExtrasPage() {
     } else {
       setMensaje({ texto: '¡Hora extra reportada con éxito!', tipo: 'exito' });
       setFormData({ ...formData, fecha: '', hora_inicio: '', hora_fin: '', motivo: '' });
-      fetchRegistros();
+      fetchRegistros(formData.cedula);
     }
   };
 
@@ -87,6 +113,7 @@ export default function HorasExtrasPage() {
             <span className="cursor-pointer hover:text-blue-950 transition">Reporting</span>
             <span className="text-blue-950 font-bold border-b-2 border-blue-950 pb-1">WFM</span>
             <span className="cursor-pointer hover:text-blue-950 transition">Gestión Humana</span>
+            <button onClick={cerrarSesion} className="bg-blue-950 text-white text-sm font-bold px-4 py-1.5 rounded hover:bg-blue-900 transition">Cerrar sesión</button>
           </nav>
         </div>
       </header>
@@ -119,7 +146,7 @@ export default function HorasExtrasPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">Cédula de Ciudadanía</label>
-              <input type="text" name="cedula" value={formData.cedula} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-gray-50 focus:bg-white text-black" placeholder="Ej: 10203040" />
+              <input type="text" name="cedula" value={formData.cedula} readOnly disabled required className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-gray-100 text-black cursor-not-allowed opacity-70" placeholder="Ej: 10203040" />
             </div>
 
             <div>
@@ -130,6 +157,11 @@ export default function HorasExtrasPage() {
                   <option key={eq} value={eq}>{eq}</option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-600">CECO</label>
+              <input type="text" name="CECO" value={formData.CECO} onChange={handleChange} required className="mt-1 block w-full border border-gray-300 rounded-md p-2 bg-gray-50 focus:bg-white text-black" placeholder="Ej: 5712200100" />
             </div>
 
             <div>
