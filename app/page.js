@@ -10,6 +10,7 @@ export default function HorasExtrasPage() {
   const [fechaMaxima, setFechaMaxima] = useState('');
   const [formData, setFormData] = useState({
     cedula: '',
+    nombre: '',
     equipo: '',
     CECO: '5712200100',
     fecha: '',
@@ -32,7 +33,9 @@ export default function HorasExtrasPage() {
       // Si el correo termina en .local extraemos la cédula automáticamente
       if (user.email.endsWith('@konecta.local')) {
         const cedulaCalculada = user.email.split('@')[0];
-        setFormData(prev => ({ ...prev, cedula: cedulaCalculada }));
+        // Obtenemos el nombre del empleado desde la tabla de negocio
+        const { data: emp } = await supabase.from('empleados').select('nombre').eq('cedula', cedulaCalculada).single();
+        setFormData(prev => ({ ...prev, cedula: cedulaCalculada, nombre: emp?.nombre || '' }));
         fetchRegistros(cedulaCalculada);
       }
     };

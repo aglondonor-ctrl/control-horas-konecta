@@ -2,11 +2,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { generarReporteJarvis } from '@/lib/reporteJarvis';
 
 export default function PanelJefePage() {
   const router = useRouter();
   const [jefe, setJefe] = useState(null);
   const [reportes, setReportes] = useState([]);
+  const [festivos, setFestivos] = useState(new Set());
   const [cargando, setCargando] = useState(true);
   const [vista, setVista] = useState('solicitudes');
 
@@ -42,6 +44,11 @@ export default function PanelJefePage() {
         .order('created_at', { ascending: false });
 
       setReportes(horasData || []);
+
+      // 4. Cargar festivos para clasificar el reporte Jarvis
+      const { data: festData } = await supabase.from('festivos').select('fecha');
+      setFestivos(new Set((festData || []).map(f => f.fecha)));
+
       setCargando(false);
     };
 
@@ -65,9 +72,9 @@ export default function PanelJefePage() {
 
   const generarReporte = () => {
     if (reportes.length === 0) return alert('No hay registros para exportar.');
-    const encabezados = ['Cedula', 'Equipo', 'CECO', 'Fecha', 'Hora Inicio', 'Hora Fin', 'Motivo', 'Estado'];
+    const encabezados = ['Cedula', 'Nombre', 'Equipo', 'CECO', 'Fecha', 'Hora Inicio', 'Hora Fin', 'Motivo', 'Estado'];
     const filas = reportes.map(r => [
-      r.cedula, r.equipo, r.CECO, r.fecha, r.hora_inicio, r.hora_fin,
+      r.cedula, r.nombre, r.equipo, r.CECO, r.fecha, r.hora_inicio, r.hora_fin,
       `"${(r.motivo || '').replace(/"/g, '""')}"`, r.estado
     ].join(','));
     const csv = '﻿' + [encabezados.join(','), ...filas].join('\n');
@@ -75,9 +82,14 @@ export default function PanelJefePage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `horas_extras_${jefe.equipo}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `horas_extras_${jefe?.equipo}_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportarJarvis = () => {
+    const aprobadas = reportes.filter(r => r.estado === 'aprobado');
+    generarReporteJarvis(aprobadas, festivos, jefe?.equipo);
   };
 
   const cerrarSesion = async () => {
@@ -85,7 +97,7 @@ export default function PanelJefePage() {
     router.push('/login');
   };
 
-  if (cargando) {
+  if (cargando || !jefe) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-100 text-black">Cargando panel de control...</div>;
   }
 
@@ -96,7 +108,8 @@ export default function PanelJefePage() {
     <div className="p-5 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div className="space-y-1">
         <div className="flex items-center gap-3">
-          <span className="font-bold text-gray-900 text-base">Cédula: {r.cedula}</span>
+          <span className="font-bold text-gray-900 text-base">{r.nombre}</span>
+          <span className="text-sm text-gray-500">CC: {r.cedula}</span>
           <span className={`text-xs font-bold uppercase px-2.5 py-0.5 rounded-full ${
             r.estado === 'pendiente' ? 'bg-amber-100 text-amber-800' :
             r.estado === 'aprobado' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -136,8 +149,8 @@ export default function PanelJefePage() {
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <p className="text-sm font-bold text-gray-900">{jefe.nombre}</p>
-            <p className="text-xs text-blue-800 font-medium">Líder de {jefe.equipo}</p>
+            <p className="text-sm font-bold text-gray-900">{jefe?.nombre}</p>
+            <p className="text-xs text-blue-800 font-medium">Líder de {jefe?.equipo}</p>
           </div>
           <button onClick={cerrarSesion} className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-md border border-red-200 font-semibold hover:bg-red-100 transition">
             Cerrar Sesión
@@ -149,7 +162,7 @@ export default function PanelJefePage() {
       <main className="max-w-5xl mx-auto p-6 md:p-8">
         {/* MENÚ DE VISTAS */}
         <div className="flex border-b border-gray-200 gap-4 mb-8">
-          {[['solicitudes', '📋 Gestionar Solicitudes'], ['historico', '📚 Histórico'], ['reporte', '📊 Generar Reporte']].map(([key, label]) => (
+          {[['solicitudes', '📋 Gestionar Solicitudes'], ['historico', '📚 Histórico'], ['reporte', '📊 Generar Reporte'], ['jarvis', '📤 Exportar Reporte Jarvis']].map(([key, label]) => (
             <button key={key} onClick={() => setVista(key)} className={`py-2 px-4 font-bold text-sm uppercase tracking-wide border-b-2 transition ${vista === key ? 'border-blue-950 text-blue-950' : 'border-transparent text-gray-400 hover:text-gray-600'}`}>
               {label}
             </button>
@@ -159,7 +172,7 @@ export default function PanelJefePage() {
         {/* VISTA: GESTIONAR SOLICITUDES (solo pendientes) */}
         {vista === 'solicitudes' && (
           <>
-            <h2 className="text-xl font-bold mb-1 text-blue-950">Solicitudes Pendientes: {jefe.equipo}</h2>
+            <h2 className="text-xl font-bold mb-1 text-blue-950">Solicitudes Pendientes: {jefe?.equipo}</h2>
             <p className="text-xs text-gray-500 mb-6">Aprueba o rechaza las horas extras pendientes de tu equipo.</p>
             <div className="space-y-4">
               {pendientes.length === 0 ? (
@@ -174,7 +187,7 @@ export default function PanelJefePage() {
         {/* VISTA: HISTÓRICO (todos los estados) */}
         {vista === 'historico' && (
           <>
-            <h2 className="text-xl font-bold mb-1 text-blue-950">Histórico del Equipo: {jefe.equipo}</h2>
+            <h2 className="text-xl font-bold mb-1 text-blue-950">Histórico del Equipo: {jefe?.equipo}</h2>
             <p className="text-xs text-gray-500 mb-6">Horas extras ya gestionadas (aprobadas o rechazadas).</p>
             <div className="space-y-4">
               {historico.length === 0 ? (
@@ -189,7 +202,7 @@ export default function PanelJefePage() {
         {/* VISTA: GENERAR REPORTE */}
         {vista === 'reporte' && (
           <div className="bg-white p-6 rounded-xl border shadow-sm">
-            <h2 className="text-xl font-bold mb-1 text-blue-950">Generar Reporte: {jefe.equipo}</h2>
+            <h2 className="text-xl font-bold mb-1 text-blue-950">Generar Reporte: {jefe?.equipo}</h2>
             <p className="text-xs text-gray-500 mb-6">Descarga un archivo CSV con todas las horas extras de tu equipo.</p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -208,6 +221,26 @@ export default function PanelJefePage() {
 
             <button onClick={generarReporte} className="bg-blue-950 text-white px-6 py-2.5 rounded-md font-bold hover:bg-blue-900 transition shadow">
               ⬇ Descargar CSV
+            </button>
+          </div>
+        )}
+
+        {/* VISTA: EXPORTAR REPORTE JARVIS */}
+        {vista === 'jarvis' && (
+          <div className="bg-white p-6 rounded-xl border shadow-sm">
+            <h2 className="text-xl font-bold mb-1 text-blue-950">Exportar Reporte Jarvis: {jefe?.equipo}</h2>
+            <p className="text-xs text-gray-500 mb-6">
+              Genera el Excel de carga de recargos administrativos con las solicitudes <strong>aprobadas</strong> de tu equipo,
+              clasificando las horas según día (lunes-sábado / domingo-festivo) y franja (diurna 06:00-18:59 / nocturna 19:00-05:59).
+            </p>
+
+            <div className="bg-gray-50 rounded-lg border p-4 text-center mb-6 w-48">
+              <p className="text-2xl font-black text-green-700">{reportes.filter(r => r.estado === 'aprobado').length}</p>
+              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Aprobadas a exportar</p>
+            </div>
+
+            <button onClick={exportarJarvis} className="bg-blue-950 text-white px-6 py-2.5 rounded-md font-bold hover:bg-blue-900 transition shadow">
+              ⬇ Descargar Excel Jarvis
             </button>
           </div>
         )}
