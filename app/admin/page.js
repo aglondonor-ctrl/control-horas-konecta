@@ -120,6 +120,25 @@ export default function AdminPanelPage() {
     cargarTodosLosDatos();
   };
 
+  const provisionarCredenciales = async () => {
+    if (!confirm('¿Crear credenciales de acceso para los empleados que aún no las tengan?')) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return mostrarAlerta('Sesión no válida, vuelve a iniciar sesión.', 'error');
+
+    const res = await fetch('/api/provisionar-empleados', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      console.error('Provisión - detalle:', data);
+      return mostrarAlerta(`Error: ${data.error}`, 'error');
+    }
+
+    if (data.errores.length) console.error('Errores de provisión:', data.errores);
+    mostrarAlerta(`Credenciales creadas: ${data.creados.length} · Ya existían: ${data.existentes.length} · Errores: ${data.errores.length}`, 'exito');
+  };
+
   const borrarRegistro = async (tabla, columnaId, id) => {
     if (confirm('¿Está seguro de eliminar este registro?')) {
       await supabase.from(tabla).delete().eq(columnaId, id);
@@ -150,6 +169,11 @@ export default function AdminPanelPage() {
           <div className="lg:col-span-2 bg-white p-6 rounded-xl border shadow-sm max-h-[600px] overflow-y-auto">
             {pestana === 'empleados' && (
               <div className="space-y-2">
+                <div className="flex justify-end mb-2">
+                  <button onClick={provisionarCredenciales} className="bg-blue-950 text-white text-xs font-bold px-3 py-1.5 rounded hover:bg-blue-900 transition">
+                    🔑 Provisionar credenciales faltantes
+                  </button>
+                </div>
                 {empleados.map(emp => (
                   <div key={emp.cedula} className="flex justify-between items-center p-3 bg-gray-50 rounded border text-sm text-black">
                     <div><strong>{emp.nombre}</strong> <span className="text-xs text-gray-500">(CC: {emp.cedula})</span></div>
