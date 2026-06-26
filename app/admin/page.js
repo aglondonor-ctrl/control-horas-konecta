@@ -15,6 +15,7 @@ export default function AdminPanelPage() {
   const [empForm, setEmpForm] = useState({ cedula: '', nombre: '', correo: '', equipo: '', telefono: '', cargo: '', estado: 'activo', editando: false });
   const [jefeForm, setJefeForm] = useState({ cedula: '', nombre: '', correo: '', equipo: '', gerencia: '', editando: false });
   const [festivoForm, setFestivoForm] = useState({ id: null, fecha: '', descripcion: '', editando: false });
+  const [filtros, setFiltros] = useState({ busqueda: '', estado: '', equipo: '', cargo: '' });
 
   useEffect(() => {
     // Guard: sin sesión activa el cliente usa la anon key y RLS bloquea las operaciones.
@@ -147,6 +148,16 @@ export default function AdminPanelPage() {
     }
   };
 
+  const equiposUnicos = [...new Set(empleados.map(e => e.equipo).filter(Boolean))].sort();
+  const cargosUnicos = [...new Set(empleados.map(e => e.cargo).filter(Boolean))].sort();
+  const busqueda = filtros.busqueda.trim().toLowerCase();
+  const empleadosFiltrados = empleados.filter(e =>
+    (!busqueda || (e.nombre || '').toLowerCase().includes(busqueda) || String(e.cedula).toLowerCase().includes(busqueda)) &&
+    (!filtros.estado || e.estado === filtros.estado) &&
+    (!filtros.equipo || e.equipo === filtros.equipo) &&
+    (!filtros.cargo || e.cargo === filtros.cargo)
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 text-gray-800">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm">
@@ -174,7 +185,35 @@ export default function AdminPanelPage() {
                     🔑 Provisionar credenciales faltantes
                   </button>
                 </div>
-                {empleados.map(emp => (
+
+                <input type="text" value={filtros.busqueda} onChange={e => setFiltros({ ...filtros, busqueda: e.target.value })} className="w-full border p-2 rounded text-black bg-gray-50 text-xs mb-2" placeholder="🔍 Buscar por nombre o cédula..." />
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-2">
+                  <select value={filtros.estado} onChange={e => setFiltros({ ...filtros, estado: e.target.value })} className="border p-2 rounded text-black bg-gray-50 text-xs">
+                    <option value="">Estado: todos</option>
+                    <option value="activo">Activo</option>
+                    <option value="inactivo">Inactivo</option>
+                  </select>
+                  <select value={filtros.equipo} onChange={e => setFiltros({ ...filtros, equipo: e.target.value })} className="border p-2 rounded text-black bg-gray-50 text-xs">
+                    <option value="">Equipo: todos</option>
+                    {equiposUnicos.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+                  </select>
+                  <select value={filtros.cargo} onChange={e => setFiltros({ ...filtros, cargo: e.target.value })} className="border p-2 rounded text-black bg-gray-50 text-xs">
+                    <option value="">Cargo: todos</option>
+                    {cargosUnicos.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex justify-between items-center text-xs text-gray-500 mb-1">
+                  <span>{empleadosFiltrados.length} de {empleados.length} empleados</span>
+                  {(filtros.busqueda || filtros.estado || filtros.equipo || filtros.cargo) && (
+                    <button onClick={() => setFiltros({ busqueda: '', estado: '', equipo: '', cargo: '' })} className="text-blue-700 font-semibold hover:underline">Limpiar filtros</button>
+                  )}
+                </div>
+
+                {empleadosFiltrados.length === 0 ? (
+                  <p className="text-gray-400 text-center py-8 italic">No hay empleados que coincidan con los filtros.</p>
+                ) : empleadosFiltrados.map(emp => (
                   <div key={emp.cedula} className="flex justify-between items-center p-3 bg-gray-50 rounded border text-sm text-black">
                     <div><strong>{emp.nombre}</strong> <span className="text-xs text-gray-500">(CC: {emp.cedula})</span></div>
                     <div className="flex items-center gap-3">

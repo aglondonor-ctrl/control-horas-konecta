@@ -11,6 +11,7 @@ export default function PanelJefePage() {
   const [festivos, setFestivos] = useState(new Set());
   const [cargando, setCargando] = useState(true);
   const [vista, setVista] = useState('solicitudes');
+  const [rango, setRango] = useState({ desde: '', hasta: '' });
 
   useEffect(() => {
     const verificarSesionYDatos = async () => {
@@ -87,9 +88,18 @@ export default function PanelJefePage() {
     URL.revokeObjectURL(url);
   };
 
+  // Aprobadas dentro del rango de fechas elegido (fecha en formato YYYY-MM-DD se compara como texto)
+  const aprobadasEnRango = () => reportes.filter(r =>
+    r.estado === 'aprobado' &&
+    (!rango.desde || r.fecha >= rango.desde) &&
+    (!rango.hasta || r.fecha <= rango.hasta)
+  );
+
   const exportarJarvis = () => {
-    const aprobadas = reportes.filter(r => r.estado === 'aprobado');
-    generarReporteJarvis(aprobadas, festivos, jefe?.equipo);
+    if (rango.desde && rango.hasta && rango.desde > rango.hasta) {
+      return alert('La fecha "Desde" no puede ser mayor que la fecha "Hasta".');
+    }
+    generarReporteJarvis(aprobadasEnRango(), festivos, jefe?.equipo);
   };
 
   const cerrarSesion = async () => {
@@ -232,11 +242,28 @@ export default function PanelJefePage() {
             <p className="text-xs text-gray-500 mb-6">
               Genera el Excel de carga de recargos administrativos con las solicitudes <strong>aprobadas</strong> de tu equipo,
               clasificando las horas según día (lunes-sábado / domingo-festivo) y franja (diurna 06:00-18:59 / nocturna 19:00-05:59).
+              Filtra por rango de fechas (opcional); si lo dejas vacío exporta todas las aprobadas.
             </p>
 
-            <div className="bg-gray-50 rounded-lg border p-4 text-center mb-6 w-48">
-              <p className="text-2xl font-black text-green-700">{reportes.filter(r => r.estado === 'aprobado').length}</p>
-              <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Aprobadas a exportar</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 max-w-md">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Desde</label>
+                <input type="date" value={rango.desde} onChange={e => setRango({ ...rango, desde: e.target.value })} className="w-full border p-2 rounded text-black bg-gray-50 text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-600 mb-1">Hasta</label>
+                <input type="date" value={rango.hasta} onChange={e => setRango({ ...rango, hasta: e.target.value })} className="w-full border p-2 rounded text-black bg-gray-50 text-sm" />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mb-6">
+              <div className="bg-gray-50 rounded-lg border p-4 text-center w-48">
+                <p className="text-2xl font-black text-green-700">{aprobadasEnRango().length}</p>
+                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">Aprobadas a exportar</p>
+              </div>
+              {(rango.desde || rango.hasta) && (
+                <button onClick={() => setRango({ desde: '', hasta: '' })} className="text-xs text-blue-700 font-semibold hover:underline">Limpiar rango</button>
+              )}
             </div>
 
             <button onClick={exportarJarvis} className="bg-blue-950 text-white px-6 py-2.5 rounded-md font-bold hover:bg-blue-900 transition shadow">
